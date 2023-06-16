@@ -1,9 +1,41 @@
 use basemath::*;
 use std::fs::create_dir_all;
+use std::fs::read_to_string;
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
 use std::thread;
+use serde_derive::Deserialize;
+use std::process::exit;
+use toml;
+
+#[derive(Deserialize)]
+struct Data {
+    config: Config,
+    advanced: Advanced,
+}
+#[derive(Deserialize)]
+struct Config {
+    width: u32,
+    height: u32,
+}
+
+#[derive(Deserialize)]
+struct Advanced {
+    seed: CompStruct,
+    topleft: CompStruct,
+    bottomright: CompStruct,
+    bound: f64,
+    iterate: u32,
+    threads: u32,
+}
+
+#[derive(Deserialize)]
+struct CompStruct {
+    r: f64,
+    i: f64,
+}
+
 
 static HEX_GS: [char; 16] = [
     '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f',
@@ -11,22 +43,44 @@ static HEX_GS: [char; 16] = [
 
 // Change me to override thread settings
 static ADVANCED_MODE: bool = false;
+static CONFIG_FILE: &str = "./config.toml";
 
 fn main() {
+
+
+    let contents = match read_to_string(CONFIG_FILE) {
+        Ok(c) => c,
+        Err(_) => {
+            eprintln!("Could not read file `{}`", CONFIG_FILE);
+            exit(1);
+        }
+    };
+
+    let data: Data = match toml::from_str(&contents) {
+        Ok(d) => d,
+        Err(_) => {
+            eprintln!("Unable to load data from `{}`", CONFIG_FILE);
+            exit(1);
+        }
+    };
+
+    let width: u32 = data.config.width;
+    let height: u32 = data.config.height;
+
+    let advanced_data = data.advanced;
+
     let _ = create_dir_all("./plots/build");
-    let seed: Comp = Comp { r: 0.0, i: 0.0 };
+    let seed: Comp = Comp { r: advanced_data.seed.r, i: advanced_data.seed.i };
     let topleft: Comp = Comp { r: -2.0, i: 2.0 };
     let bottomright: Comp = Comp { r: 2.0, i: -2.0 };
     let bound: f64 = 2.0;
-    let width: u32 = 16384;
-    let height: u32 = 16384;
+    
     let iterate: usize = 128;
-    let parallelism = thread::available_parallelism();
-
     let mut threads: u32 = 2;
-
+    
+    
     if !ADVANCED_MODE {
-        threads = match parallelism {
+        threads = match thread::available_parallelism() {
             Ok(res) => res.get().try_into().unwrap(),
             Err(error) => {
                 println!(

@@ -1,0 +1,11 @@
+[config]
+width = 2048
+height = 2048
+
+[advanced]
+seed = { r = 0.0, i = 0.0 }
+topleft = { r = -2.0, i = 2.0 }
+bottomright = { r = 2.0, i = -2.0 }
+bound = 2.0
+iterate = 128
+threads = -1
